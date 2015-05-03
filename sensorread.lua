@@ -29,6 +29,8 @@ tmr.delay(1000000)
 gpio.mode(_SENSOR_PIN, gpio.INT)
 working = true
 last_state = 0
+first_connect = false
+connect_attempts = 0
 
 connecttoap = function(ssid, pwd)
     wifi.setmode(wifi.STATION)
@@ -42,6 +44,10 @@ function pin1cb(level)
 	if level == last_state then
 		return
 	end
+	if wifi.sta.status() ~= 5 and first_connect then
+		node.restart()
+	end     
+
 	last_state = level
 	local usestate = ""
 	if level == 1 then
@@ -58,7 +64,7 @@ function pin1cb(level)
     )
     sk:on("connection", function(sck)
     		local _GET = "GET /?sensor=".._SENSOR_ID.."&state="..usestate.." HTTP/1.0\r\n\r\n"
-            sck:send(_GET)         
+            sck:send(_GET)    
         end 
     )
     sk:connect(80, _SERVER_IP)    
@@ -71,9 +77,14 @@ connecttoap(_SSID, _PWD)
 
 tmr.alarm( 0, 3000, 1,
     function()
-    	print("CONNECING...")
+    	connect_attempts = connect_attempts + 1
+    	print("CONNECTING...")
         if wifi.sta.status() == 5 then
+        	first_connect = true
             tmr.stop(0)            
+        end
+        if connect_attempts > 20 then
+        	node.restart()
         end
     end
 )
